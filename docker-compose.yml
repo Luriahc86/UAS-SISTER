@@ -1,0 +1,117 @@
+# =============================================================================
+# Docker Compose — Pub-Sub Log Aggregator Terdistribusi
+# =============================================================================
+# Services:
+#   aggregator  : FastAPI API (exposed port 3000)
+#   worker      : Redis Stream consumer → PostgreSQL
+#   publisher   : Event simulator / benchmark tool
+#   redis       : Internal broker (Redis Stream)
+#   postgres    : Persistent storage
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — Persistent event storage
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: pubsubdb
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app_password
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - app_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d pubsubdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---------------------------------------------------------------------------
+  # Redis — Internal message broker (Redis Stream)
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - app_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---------------------------------------------------------------------------
+  # Aggregator — FastAPI API service (only service exposed to host)
+  # ---------------------------------------------------------------------------
+  aggregator:
+    build: ./aggregator
+    image: pubsub-aggregator:latest
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://app:app_password@postgres:5432/pubsubdb
+      REDIS_URL: redis://redis:6379/0
+      APP_PORT: "3000"
+    ports:
+      - "3000:3000"
+    networks:
+      - app_net
+
+  # ---------------------------------------------------------------------------
+  # Worker — Redis Stream consumer, processes events into PostgreSQL
+  # ---------------------------------------------------------------------------
+  worker:
+    build: ./aggregator
+    image: pubsub-aggregator:latest
+    command: ["python", "-m", "app.worker"]
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://app:app_password@postgres:5432/pubsubdb
+      REDIS_URL: redis://redis:6379/0
+      WORKER_NAME: worker-1
+    networks:
+      - app_net
+
+  # ---------------------------------------------------------------------------
+  # Publisher — Event simulator and benchmark tool
+  # ---------------------------------------------------------------------------
+  publisher:
+    build: ./publisher
+    image: pubsub-publisher:latest
+    depends_on:
+      - aggregator
+    environment:
+      AGGREGATOR_URL: http://aggregator:3000
+      TOTAL_EVENTS: "20000"
+      DUPLICATE_RATE: "0.30"
+      BATCH_SIZE: "100"
+    networks:
+      - app_net
+    profiles:
+      - benchmark
+
+# =============================================================================
+# Named Volumes — Data persistence across container restarts
+# =============================================================================
+volumes:
+  pg_data:
+  redis_data:
+
+# =============================================================================
+# Network — All services communicate via internal bridge network
+# =============================================================================
+networks:
+  app_net:
+    driver: bridge

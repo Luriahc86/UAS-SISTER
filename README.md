@@ -1,0 +1,323 @@
+# Pub-Sub Log Aggregator Terdistribusi
+
+Sistem Pub-Sub log aggregator multi-service menggunakan **FastAPI**, **Redis Stream**, **PostgreSQL**, dan **Docker Compose** dengan fitur **idempotent consumer**, **deduplication**, dan **transaction/concurrency control**.
+
+## Deskripsi Singkat
+
+Sistem ini menerima event log dari berbagai sumber (publisher), memasukkannya ke antrian internal (Redis Stream), lalu memprosesnya secara aman ke database (PostgreSQL). Event yang sama tidak akan diproses lebih dari satu kali berkat mekanisme deduplication berbasis database constraint `UNIQUE(topic, event_id)` dan transaksi database.
+
+## Arsitektur
+
+```
+┌───────────┐     HTTP POST      ┌─────────────┐     Redis Stream     ┌─────────────┐
+│ Publisher  │ ─────────────────→ │ Aggregator  │ ──────────────────→ │   Worker    │
+│ (simulator)│     /publish       │ (FastAPI)   │    events_stream     │ (consumer)  │
+└───────────┘                    └─────────────┘                     └──────┬──────┘
+                                       │                                    │
+                                       │ GET /events                        │ INSERT
+                                       │ GET /stats                         │ (transaction +
+                                       │ GET /health                        │  dedup)
+                                       ▼                                    ▼
+                                 ┌─────────────┐                     ┌─────────────┐
+                                 │   Redis     │                     │ PostgreSQL  │
+                                 │  (broker)   │                     │ (storage)   │
+                                 └─────────────┘                     └─────────────┘
+```
+
+### Services
+
+| Service      | Fungsi                                        | Port         |
+|-------------|-----------------------------------------------|--------------|
+| `aggregator` | FastAPI API — menerima & query event         | `3000` (exposed) |
+| `worker`     | Consumer — proses event dari Redis ke PostgreSQL | internal     |
+| `publisher`  | Simulator — generate & kirim event           | internal     |
+| `redis`      | Broker — Redis Stream message queue          | internal     |
+| `postgres`   | Storage — database persisten                  | internal     |
+
+> **Catatan**: Hanya `aggregator` yang expose port ke host (`3000:3000`). Redis dan PostgreSQL hanya bisa diakses dari dalam Docker network.
+
+## Fitur Utama
+
+- ✅ Publish event single dan batch via HTTP API
+- ✅ Queue internal dengan Redis Stream + consumer group
+- ✅ **Deduplication** berbasis `(topic, event_id)` dengan PostgreSQL constraint
+- ✅ **Idempotent consumer** — event yang sama tidak diproses ulang
+- ✅ **Transaksi PostgreSQL** dengan `INSERT ... ON CONFLICT DO NOTHING`
+- ✅ **Concurrency control** — race condition dicegah oleh UNIQUE constraint
+- ✅ Statistik real-time via `/stats`
+- ✅ Health check via `/health`
+- ✅ **Persistence** dengan Docker named volume
+- ✅ 20 test case (unit + integration)
+- ✅ Benchmark 20.000 event dengan 30% duplikat
+
+## Cara Menjalankan
+
+### Prerequisites
+
+- Docker & Docker Compose
+
+### Build dan Run
+
+```bash
+# Build dan jalankan semua service (kecuali publisher)
+docker compose up --build
+
+# Atau jalankan di background
+docker compose up --build -d
+```
+
+### Cek Container
+
+```bash
+docker compose ps
+```
+
+### Cek Health
+
+```bash
+curl http://localhost:3000/health
+```
+
+## Endpoint API
+
+### 1. `POST /publish`
+
+Menerima single event atau batch event.
+
+**Single event:**
+```bash
+curl -X POST http://localhost:3000/publish \
+  -H "Content-Type: application/json" \
+  -d '{
+    "topic": "payment.created",
+    "event_id": "550e8400-e29b-41d4-a716-446655440000",
+    "timestamp": "2026-06-12T10:00:00Z",
+    "source": "publisher-1",
+    "payload": {"user_id": "U001", "amount": 150000, "currency": "IDR"}
+  }'
+```
+
+**Batch event:**
+```bash
+curl -X POST http://localhost:3000/publish \
+  -H "Content-Type: application/json" \
+  -d '[
+    {"topic": "payment.created", "event_id": "event-001", "timestamp": "2026-06-12T10:00:00Z", "source": "pub-1", "payload": {"amount": 100000}},
+    {"topic": "auth.login", "event_id": "event-002", "timestamp": "2026-06-12T10:00:01Z", "source": "pub-1", "payload": {"user_id": "U001"}}
+  ]'
+```
+
+**Response:**
+```json
+{
+  "accepted": 2,
+  "queued": 2,
+  "message": "events accepted"
+}
+```
+
+### 2. `GET /events?topic=...`
+
+Mengembalikan daftar event unik yang sudah diproses.
+
+```bash
+curl "http://localhost:3000/events?topic=payment.created"
+```
+
+**Response:**
+```json
+{
+  "topic": "payment.created",
+  "count": 1,
+  "events": [
+    {
+      "topic": "payment.created",
+      "event_id": "550e8400-e29b-41d4-a716-446655440000",
+      "timestamp": "2026-06-12T10:00:00+00:00",
+      "source": "publisher-1",
+      "payload": {"user_id": "U001", "amount": 150000, "currency": "IDR"},
+      "processed_at": "2026-06-12T10:00:05+00:00"
+    }
+  ]
+}
+```
+
+### 3. `GET /stats`
+
+Menampilkan metrik sistem.
+
+```bash
+curl http://localhost:3000/stats
+```
+
+**Response:**
+```json
+{
+  "received_total": 20000,
+  "queued_total": 20000,
+  "unique_processed": 14000,
+  "duplicates_dropped": 6000,
+  "failed_total": 0,
+  "topic_count": 10,
+  "uptime_seconds": 321.45,
+  "duplicate_rate": 0.30,
+  "throughput_events_per_second": 43.56
+}
+```
+
+### 4. `GET /health`
+
+Health check endpoint.
+
+```bash
+curl http://localhost:3000/health
+```
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "database": "ok",
+  "broker": "ok"
+}
+```
+
+## Cara Menjalankan Test
+
+```bash
+# Jalankan semua test di dalam container
+docker compose run --rm aggregator pytest -v
+
+# Jalankan test tertentu
+docker compose run --rm aggregator pytest tests/test_dedup.py -v
+docker compose run --rm aggregator pytest tests/test_concurrency.py -v
+```
+
+## Cara Benchmark
+
+```bash
+# Jalankan publisher (benchmark 20.000 event)
+docker compose --profile benchmark run --rm publisher
+
+# Cek hasil di stats
+curl http://localhost:3000/stats
+```
+
+## Demo Scaling Worker
+
+```bash
+# Jalankan 3 worker secara bersamaan
+docker compose up --scale worker=3
+
+# Kirim event duplikat dan lihat log
+# Hanya satu worker yang berhasil insert, sisanya drop duplicate
+```
+
+## Demo Deduplication
+
+```bash
+# Kirim event yang sama 5 kali
+for i in $(seq 1 5); do
+  curl -X POST http://localhost:3000/publish \
+    -H "Content-Type: application/json" \
+    -d '{"topic":"payment.created","event_id":"dup-test-001","timestamp":"2026-06-12T10:00:00Z","source":"demo","payload":{"amount":150000}}'
+done
+
+# Verifikasi: event hanya muncul 1x
+curl "http://localhost:3000/events?topic=payment.created"
+
+# Verifikasi: duplicates_dropped = 4
+curl http://localhost:3000/stats
+```
+
+## Bukti Persistence
+
+Data tersimpan di Docker named volume `pg_data` dan `redis_data`:
+
+```bash
+# Lihat volume
+docker volume ls
+
+# Restart tanpa menghapus volume
+docker compose down
+docker compose up -d
+
+# Data tetap ada
+curl http://localhost:3000/events?topic=payment.created
+curl http://localhost:3000/stats
+```
+
+> ⚠️ **Jangan** gunakan `docker compose down -v` karena itu menghapus volume dan data.
+
+## Struktur Repository
+
+```
+pubsub-log-aggregator/
+├── aggregator/
+│   ├── app/
+│   │   ├── __init__.py
+│   │   ├── main.py              # FastAPI endpoints
+│   │   ├── models.py            # Pydantic event schema
+│   │   ├── db.py                # Koneksi database
+│   │   ├── broker.py            # Redis Stream helper
+│   │   ├── worker.py            # Consumer/worker logic
+│   │   ├── stats.py             # Statistik sistem
+│   │   └── migrations.py        # Create table
+│   ├── tests/
+│   │   ├── conftest.py
+│   │   ├── test_schema.py
+│   │   ├── test_publish.py
+│   │   ├── test_events.py
+│   │   ├── test_dedup.py
+│   │   ├── test_stats.py
+│   │   ├── test_concurrency.py
+│   │   ├── test_health.py
+│   │   └── test_persistence.py
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   └── pytest.ini
+├── publisher/
+│   ├── publisher.py
+│   ├── Dockerfile
+│   └── requirements.txt
+├── docs/
+│   ├── architecture.md
+│   ├── api.md
+│   └── demo_script.md
+├── tests/
+│   ├── integration_test_plan.md
+│   └── benchmark_plan.md
+├── docker-compose.yml
+├── README.md
+├── report.md
+└── .gitignore
+```
+
+## Asumsi dan Batasan
+
+1. **Redis dan PostgreSQL hanya internal Compose** — tidak bisa diakses dari luar Docker network.
+2. **Ordering global tidak dijamin** — ordering praktis berdasarkan `timestamp` dan `processed_at`.
+3. **Dedup key adalah `(topic, event_id)`** — event dengan `event_id` sama tapi `topic` berbeda dianggap event berbeda.
+4. **Isolation level: READ COMMITTED** — sufficient karena UNIQUE constraint menjadi penjaga utama.
+5. **Retry**: Redis Stream consumer group dengan XACK memastikan event tidak hilang jika worker crash.
+
+## Video Demo
+
+📹 Link YouTube: `[PLACEHOLDER — ganti dengan link video demo]`
+
+Durasi minimal 25 menit mencakup:
+1. Pembukaan dan arsitektur
+2. Build dan run Docker Compose
+3. Demo publish event normal
+4. Demo deduplication dan idempotency
+5. Demo race condition / concurrency
+6. Demo crash dan persistence
+7. Demo benchmark 20.000 event
+8. Penutup
+
+## Referensi
+
+- Coulouris, G., Dollimore, J., Kindberg, T., & Blair, G. (2012). *Distributed Systems: Concepts and Design* (5th ed.). Pearson.
+- Kleppmann, M. (2017). *Designing Data-Intensive Applications*. O'Reilly Media.
+- PostgreSQL Documentation. (n.d.). *INSERT ON CONFLICT*. https://www.postgresql.org/docs/15/sql-insert.html
+- Redis Documentation. (n.d.). *Redis Streams*. https://redis.io/docs/data-types/streams/
