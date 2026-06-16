@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pub-Sub Log Aggregator — Dashboard</title>
+    <meta name="description" content="Dashboard interaktif Pub-Sub Log Aggregator Terdistribusi — Sistem Terdistribusi UAS">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- PARTICLE BACKGROUND -->
+    <canvas id="particles-canvas"></canvas>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                    <path d="M2 17l10 5 10-5"/>
+                    <path d="M2 12l10 5 10-5"/>
+                </svg>
+            </div>
+            <div class="brand-text">
+                <span class="brand-title">PubSub</span>
+                <span class="brand-subtitle">Log Aggregator</span>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active" data-section="overview" id="nav-overview">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                <span>Overview</span>
+            </a>
+            <a href="#" class="nav-item" data-section="publish" id="nav-publish">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                <span>Publish Event</span>
+            </a>
+            <a href="#" class="nav-item" data-section="events" id="nav-events">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                <span>Event Log</span>
+            </a>
+            <a href="#" class="nav-item" data-section="dedup" id="nav-dedup">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
+                <span>Demo Dedup</span>
+            </a>
+            <a href="#" class="nav-item" data-section="architecture" id="nav-architecture">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                <span>Arsitektur</span>
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="connection-status" id="connection-status">
+                <span class="status-dot offline"></span>
+                <span class="status-text">Checking...</span>
+            </div>
+            <div class="sidebar-info">Sistem Terdistribusi — UAS</div>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content" id="main-content">
+        <!-- HEADER -->
+        <header class="top-header">
+            <div class="header-left">
+                <button class="menu-toggle" id="menu-toggle" aria-label="Toggle menu">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                </button>
+                <div class="header-title">
+                    <h1 id="page-title">Overview</h1>
+                    <p class="header-subtitle" id="page-subtitle">Real-time system metrics & monitoring</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="api-badge">
+                    <span class="badge-dot"></span>
+                    <span>localhost:3000</span>
+                </div>
+                <button class="btn-icon" id="btn-refresh" title="Refresh Data">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- SECTIONS -->
+        <div class="sections-container">
+
+            <!-- ====== OVERVIEW ====== -->
+            <section class="section active" id="section-overview">
+                <div class="health-banner" id="health-banner">
+                    <div class="health-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    </div>
+                    <div class="health-info">
+                        <span class="health-title" id="health-title">Checking system health...</span>
+                        <span class="health-detail" id="health-detail">Connecting to services</span>
+                    </div>
+                    <div class="health-badges">
+                        <span class="health-badge">🗄️ Database: <strong id="db-status">—</strong></span>
+                        <span class="health-badge">📡 Broker: <strong id="broker-status">—</strong></span>
+                    </div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <div class="stat-icon received"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+                            <span class="stat-label">Received Total</span>
+                        </div>
+                        <div class="stat-value" id="stat-received">—</div>
+                        <div class="stat-bar"><div class="stat-bar-fill received" id="bar-received"></div></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <div class="stat-icon queued"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg></div>
+                            <span class="stat-label">Queued Total</span>
+                        </div>
+                        <div class="stat-value" id="stat-queued">—</div>
+                        <div class="stat-bar"><div class="stat-bar-fill queued" id="bar-queued"></div></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <div class="stat-icon unique"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+                            <span class="stat-label">Unique Processed</span>
+                        </div>
+                        <div class="stat-value" id="stat-unique">—</div>
+                        <div class="stat-bar"><div class="stat-bar-fill unique" id="bar-unique"></div></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <div class="stat-icon duplicates"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></div>
+                            <span class="stat-label">Duplicates Dropped</span>
+                        </div>
+                        <div class="stat-value" id="stat-duplicates">—</div>
+                        <div class="stat-bar"><div class="stat-bar-fill duplicates" id="bar-duplicates"></div></div>
+                    </div>
+                </div>
+
+                <div class="metrics-row">
+                    <div class="metric-card glass">
+                        <div class="metric-header"><span class="metric-emoji">⚡</span><span class="metric-title">Throughput</span></div>
+                        <div class="metric-value" id="metric-throughput">—</div>
+                        <div class="metric-unit">events/sec</div>
+                    </div>
+                    <div class="metric-card glass">
+                        <div class="metric-header"><span class="metric-emoji">🔁</span><span class="metric-title">Duplicate Rate</span></div>
+                        <div class="metric-value" id="metric-duprate">—</div>
+                        <div class="metric-unit">ratio</div>
+                    </div>
+                    <div class="metric-card glass">
+                        <div class="metric-header"><span class="metric-emoji">📂</span><span class="metric-title">Topics</span></div>
+                        <div class="metric-value" id="metric-topics">—</div>
+                        <div class="metric-unit">unique topics</div>
+                    </div>
+                    <div class="metric-card glass">
+                        <div class="metric-header"><span class="metric-emoji">⏱️</span><span class="metric-title">Uptime</span></div>
+                        <div class="metric-value" id="metric-uptime">—</div>
+                        <div class="metric-unit">seconds</div>
+                    </div>
+                    <div class="metric-card glass">
+                        <div class="metric-header"><span class="metric-emoji">❌</span><span class="metric-title">Failed</span></div>
+                        <div class="metric-value" id="metric-failed">—</div>
+                        <div class="metric-unit">events</div>
+                    </div>
+                </div>
+
+                <div class="chart-section glass">
+                    <div class="chart-header">
+                        <h3>📊 Event Processing — Live Chart</h3>
+                        <div class="chart-legend">
+                            <span class="legend-item"><span class="legend-dot unique"></span>Unique</span>
+                            <span class="legend-item"><span class="legend-dot duplicates"></span>Duplicates</span>
+                        </div>
+                    </div>
+                    <canvas id="live-chart" width="800" height="250"></canvas>
+                </div>
+            </section>
+
+            <!-- ====== PUBLISH EVENT ====== -->
+            <section class="section" id="section-publish">
+                <div class="publish-container">
+                    <div class="publish-form-wrapper glass">
+                        <h2 class="section-title">📤 Publish Event</h2>
+                        <p class="section-desc">Kirim event ke aggregator. Event akan divalidasi, masuk ke Redis Stream, dan diproses oleh worker.</p>
+                        <form id="publish-form" autocomplete="off">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="input-topic">Topic</label>
+                                    <input type="text" id="input-topic" placeholder="payment.created" value="payment.created" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="input-event-id">Event ID</label>
+                                    <div class="input-with-btn">
+                                        <input type="text" id="input-event-id" placeholder="UUID" required>
+                                        <button type="button" class="btn-small" id="btn-gen-uuid" title="Generate UUID">🎲</button>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="input-source">Source</label>
+                                    <input type="text" id="input-source" placeholder="publisher-1" value="demo-dashboard">
+                                </div>
+                                <div class="form-group">
+                                    <label for="input-timestamp">Timestamp</label>
+                                    <div class="input-with-btn">
+                                        <input type="text" id="input-timestamp" placeholder="ISO8601" required>
+                                        <button type="button" class="btn-small" id="btn-gen-timestamp" title="Now">🕐</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group full-width">
+                                <label for="input-payload">Payload (JSON)</label>
+                                <textarea id="input-payload" rows="3">{"user_id": "U001", "amount": 150000, "currency": "IDR"}</textarea>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary" id="btn-publish">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg>
+                                    Publish Event
+                                </button>
+                                <button type="button" class="btn btn-secondary" id="btn-publish-batch">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                                    Batch (5 events)
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="publish-response glass" id="publish-response" style="display:none;">
+                        <h3>📬 Response</h3>
+                        <pre id="publish-response-body"></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ====== EVENT LOG ====== -->
+            <section class="section" id="section-events">
+                <div class="events-container">
+                    <div class="events-toolbar glass">
+                        <h2 class="section-title">📋 Event Log</h2>
+                        <div class="events-filters">
+                            <div class="form-group inline">
+                                <label for="filter-topic">Topic</label>
+                                <input type="text" id="filter-topic" placeholder="All topics">
+                            </div>
+                            <div class="form-group inline">
+                                <label for="filter-limit">Limit</label>
+                                <select id="filter-limit">
+                                    <option value="10">10</option>
+                                    <option value="25">25</option>
+                                    <option value="50" selected>50</option>
+                                    <option value="100">100</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary btn-sm" id="btn-fetch-events">🔍 Fetch</button>
+                        </div>
+                    </div>
+                    <div class="events-count glass" id="events-count-banner" style="display:none;">
+                        <span id="events-count-text"></span>
+                    </div>
+                    <div class="events-table-wrapper glass">
+                        <table class="events-table" id="events-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th><th>Topic</th><th>Event ID</th><th>Source</th>
+                                    <th>Timestamp</th><th>Processed At</th><th>Payload</th>
+                                </tr>
+                            </thead>
+                            <tbody id="events-tbody">
+                                <tr class="empty-row"><td colspan="7">Klik <strong>Fetch</strong> untuk memuat event</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ====== DEDUP DEMO ====== -->
+            <section class="section" id="section-dedup">
+                <div class="dedup-container">
+                    <div class="dedup-explainer glass">
+                        <h2 class="section-title">🔄 Demo Deduplication & Idempotency</h2>
+                        <p class="section-desc">
+                            Kirim event yang <strong>sama persis</strong> berkali-kali. Sistem hanya memproses 1x berkat mekanisme
+                            <code>INSERT ... ON CONFLICT DO NOTHING</code> pada constraint <code>UNIQUE(topic, event_id)</code>.
+                        </p>
+                        <div class="dedup-info-cards">
+                            <div class="info-card">
+                                <div class="info-card-icon">🔑</div>
+                                <div class="info-card-content"><strong>Dedup Key</strong><span>(topic, event_id)</span></div>
+                            </div>
+                            <div class="info-card">
+                                <div class="info-card-icon">🛡️</div>
+                                <div class="info-card-content"><strong>Mechanism</strong><span>PostgreSQL UNIQUE constraint</span></div>
+                            </div>
+                            <div class="info-card">
+                                <div class="info-card-icon">⚛️</div>
+                                <div class="info-card-content"><strong>Pattern</strong><span>Idempotent write (ON CONFLICT)</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="dedup-controls glass">
+                        <div class="dedup-form">
+                            <div class="form-group">
+                                <label for="dedup-event-id">Event ID (sama untuk semua pengiriman)</label>
+                                <div class="input-with-btn">
+                                    <input type="text" id="dedup-event-id" value="dedup-demo-001">
+                                    <button type="button" class="btn-small" id="btn-gen-dedup-id">🎲</button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="dedup-count">Jumlah pengiriman</label>
+                                <input type="number" id="dedup-count" value="5" min="2" max="20">
+                            </div>
+                        </div>
+                        <button class="btn btn-primary btn-lg" id="btn-dedup-demo">▶ Mulai Demo Dedup</button>
+                    </div>
+                    <div class="dedup-results glass" id="dedup-results" style="display:none;">
+                        <h3>📋 Hasil Demo Deduplication</h3>
+                        <div class="dedup-progress" id="dedup-progress"></div>
+                        <div class="dedup-summary" id="dedup-summary"></div>
+                        <div class="dedup-verify" id="dedup-verify"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ====== ARCHITECTURE ====== -->
+            <section class="section" id="section-architecture">
+                <div class="arch-container">
+                    <div class="arch-header glass">
+                        <h2 class="section-title">🏗️ Arsitektur Sistem</h2>
+                        <p class="section-desc">
+                            Pub-Sub Log Aggregator menggunakan arsitektur event-driven dengan Redis Stream sebagai broker internal
+                            dan PostgreSQL untuk persistent storage. Deduplication dan concurrency control dilakukan di level database.
+                        </p>
+                    </div>
+                    <div class="arch-diagram glass">
+                        <div class="arch-flow">
+                            <div class="arch-node publisher-node">
+                                <div class="arch-node-icon">📤</div>
+                                <div class="arch-node-label">Publisher</div>
+                                <div class="arch-node-sub">Event Simulator</div>
+                            </div>
+                            <div class="arch-arrow"><div class="arch-arrow-line"></div><div class="arch-arrow-label">HTTP POST /publish</div></div>
+                            <div class="arch-node aggregator-node">
+                                <div class="arch-node-icon">🔀</div>
+                                <div class="arch-node-label">Aggregator</div>
+                                <div class="arch-node-sub">FastAPI — port 3000</div>
+                            </div>
+                            <div class="arch-arrow"><div class="arch-arrow-line"></div><div class="arch-arrow-label">Redis Stream XADD</div></div>
+                            <div class="arch-node redis-node">
+                                <div class="arch-node-icon">📡</div>
+                                <div class="arch-node-label">Redis</div>
+                                <div class="arch-node-sub">Broker — Stream</div>
+                            </div>
+                            <div class="arch-arrow"><div class="arch-arrow-line"></div><div class="arch-arrow-label">XREADGROUP</div></div>
+                            <div class="arch-node worker-node">
+                                <div class="arch-node-icon">⚙️</div>
+                                <div class="arch-node-label">Worker</div>
+                                <div class="arch-node-sub">Consumer — Dedup</div>
+                            </div>
+                            <div class="arch-arrow"><div class="arch-arrow-line"></div><div class="arch-arrow-label">INSERT ON CONFLICT</div></div>
+                            <div class="arch-node postgres-node">
+                                <div class="arch-node-icon">🗄️</div>
+                                <div class="arch-node-label">PostgreSQL</div>
+                                <div class="arch-node-sub">Persistent Storage</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="features-grid">
+                        <div class="feature-card glass"><div class="feature-icon">🔒</div><h4>Idempotent Consumer</h4><p>Event yang sama tidak diproses lebih dari 1x. Worker menggunakan INSERT ON CONFLICT DO NOTHING.</p></div>
+                        <div class="feature-card glass"><div class="feature-icon">🧬</div><h4>Deduplication</h4><p>Dedup key: (topic, event_id). PostgreSQL UNIQUE constraint menjamin tidak ada duplikat di database.</p></div>
+                        <div class="feature-card glass"><div class="feature-icon">⚡</div><h4>Concurrency Control</h4><p>Race condition dicegah oleh UNIQUE constraint + atomic upsert. Multi-worker bisa berjalan paralel.</p></div>
+                        <div class="feature-card glass"><div class="feature-icon">💾</div><h4>Persistence</h4><p>Docker named volume (pg_data, redis_data) memastikan data bertahan saat restart container.</p></div>
+                        <div class="feature-card glass"><div class="feature-icon">📊</div><h4>ACID Transactions</h4><p>Insert dedup + insert event + update stats dalam satu transaksi. Rollback jika ada kegagalan.</p></div>
+                        <div class="feature-card glass"><div class="feature-icon">🔄</div><h4>Fault Tolerance</h4><p>Redis PEL + consumer group memastikan event tidak hilang saat worker crash.</p></div>
+                    </div>
+                    <div class="tech-stack glass">
+                        <h3>🛠️ Technology Stack</h3>
+                        <div class="tech-items">
+                            <div class="tech-item"><span>🐍</span><span>Python</span></div>
+                            <div class="tech-item"><span>⚡</span><span>FastAPI</span></div>
+                            <div class="tech-item"><span>🔴</span><span>Redis Stream</span></div>
+                            <div class="tech-item"><span>🐘</span><span>PostgreSQL</span></div>
+                            <div class="tech-item"><span>🐳</span><span>Docker Compose</span></div>
+                            <div class="tech-item"><span>🧪</span><span>Pytest</span></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- TOAST CONTAINER -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

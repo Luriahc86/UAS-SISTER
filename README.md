@@ -49,6 +49,7 @@ Sistem ini menerima event log dari berbagai sumber (publisher), memasukkannya ke
 - ✅ **Persistence** dengan Docker named volume
 - ✅ 20 test case (unit + integration)
 - ✅ Benchmark 20.000 event dengan 30% duplikat
+- ✅ **Dashboard UI** interaktif terintegrasi di FastAPI
 
 ## Cara Menjalankan
 
@@ -59,12 +60,27 @@ Sistem ini menerima event log dari berbagai sumber (publisher), memasukkannya ke
 ### Build dan Run
 
 ```bash
-# Build dan jalankan semua service (kecuali publisher)
 docker compose up --build
 
-# Atau jalankan di background
 docker compose up --build -d
 ```
+
+### Buka Dashboard
+
+Setelah `docker compose up --build`, buka browser:
+
+```
+http://localhost:3000/dashboard
+```
+
+> **Dashboard sudah terintegrasi di FastAPI.** Tidak perlu install atau menjalankan apapun tambahan. Cukup `docker compose up --build` lalu buka URL di atas.
+
+Dashboard menyediakan 5 halaman untuk demo:
+1. **Overview** — Health status, metrik real-time, live chart
+2. **Publish Event** — Kirim event langsung dari browser
+3. **Event Log** — Lihat event yang sudah diproses di database
+4. **Demo Dedup** — Demo deduplication & idempotency secara visual
+5. **Arsitektur** — Diagram arsitektur, fitur, dan tech stack
 
 ### Cek Container
 
@@ -185,10 +201,8 @@ curl http://localhost:3000/health
 ## Cara Menjalankan Test
 
 ```bash
-# Jalankan semua test di dalam container
 docker compose run --rm aggregator pytest -v
 
-# Jalankan test tertentu
 docker compose run --rm aggregator pytest tests/test_dedup.py -v
 docker compose run --rm aggregator pytest tests/test_concurrency.py -v
 ```
@@ -196,37 +210,28 @@ docker compose run --rm aggregator pytest tests/test_concurrency.py -v
 ## Cara Benchmark
 
 ```bash
-# Jalankan publisher (benchmark 20.000 event)
 docker compose --profile benchmark run --rm publisher
 
-# Cek hasil di stats
 curl http://localhost:3000/stats
 ```
 
 ## Demo Scaling Worker
 
 ```bash
-# Jalankan 3 worker secara bersamaan
 docker compose up --scale worker=3
-
-# Kirim event duplikat dan lihat log
-# Hanya satu worker yang berhasil insert, sisanya drop duplicate
 ```
 
 ## Demo Deduplication
 
 ```bash
-# Kirim event yang sama 5 kali
 for i in $(seq 1 5); do
   curl -X POST http://localhost:3000/publish \
     -H "Content-Type: application/json" \
     -d '{"topic":"payment.created","event_id":"dup-test-001","timestamp":"2026-06-12T10:00:00Z","source":"demo","payload":{"amount":150000}}'
 done
 
-# Verifikasi: event hanya muncul 1x
 curl "http://localhost:3000/events?topic=payment.created"
 
-# Verifikasi: duplicates_dropped = 4
 curl http://localhost:3000/stats
 ```
 
@@ -235,14 +240,11 @@ curl http://localhost:3000/stats
 Data tersimpan di Docker named volume `pg_data` dan `redis_data`:
 
 ```bash
-# Lihat volume
 docker volume ls
 
-# Restart tanpa menghapus volume
 docker compose down
 docker compose up -d
 
-# Data tetap ada
 curl http://localhost:3000/events?topic=payment.created
 curl http://localhost:3000/stats
 ```
@@ -256,13 +258,13 @@ pubsub-log-aggregator/
 ├── aggregator/
 │   ├── app/
 │   │   ├── __init__.py
-│   │   ├── main.py              # FastAPI endpoints
-│   │   ├── models.py            # Pydantic event schema
-│   │   ├── db.py                # Koneksi database
-│   │   ├── broker.py            # Redis Stream helper
-│   │   ├── worker.py            # Consumer/worker logic
-│   │   ├── stats.py             # Statistik sistem
-│   │   └── migrations.py        # Create table
+│   │   ├── main.py
+│   │   ├── models.py
+│   │   ├── db.py
+│   │   ├── broker.py
+│   │   ├── worker.py
+│   │   ├── stats.py
+│   │   └── migrations.py
 │   ├── tests/
 │   │   ├── conftest.py
 │   │   ├── test_schema.py
@@ -273,6 +275,10 @@ pubsub-log-aggregator/
 │   │   ├── test_concurrency.py
 │   │   ├── test_health.py
 │   │   └── test_persistence.py
+│   ├── static/
+│   │   ├── index.html
+│   │   ├── style.css
+│   │   └── app.js
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   └── pytest.ini
