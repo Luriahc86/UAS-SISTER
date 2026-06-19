@@ -298,32 +298,3 @@ pubsub-log-aggregator/
 ├── report.md
 └── .gitignore
 ```
-
-## Asumsi dan Batasan
-
-1. **Redis dan PostgreSQL hanya internal Compose** — tidak bisa diakses dari luar Docker network.
-2. **Ordering global tidak dijamin** — ordering praktis berdasarkan `timestamp` dan `processed_at`.
-3. **Dedup key adalah `(topic, event_id)`** — event dengan `event_id` sama tapi `topic` berbeda dianggap event berbeda.
-4. **Isolation level: READ COMMITTED** — sufficient karena UNIQUE constraint menjadi penjaga utama.
-5. **Retry**: Redis Stream consumer group dengan XACK memastikan event tidak hilang jika worker crash.
-
-## Video Demo
-
-📹 Link YouTube: `[PLACEHOLDER — ganti dengan link video demo]`
-
-Durasi minimal 25 menit mencakup:
-1. Pembukaan dan arsitektur
-2. Build dan run Docker Compose
-3. Demo publish event normal
-4. Demo deduplication dan idempotency
-5. Demo race condition / concurrency
-6. Demo crash dan persistence
-7. Demo benchmark 20.000 event
-8. Penutup
-
-## Referensi
-
-- Coulouris, G., Dollimore, J., Kindberg, T., & Blair, G. (2012). *Distributed Systems: Concepts and Design* (5th ed.). Pearson.
-- Kleppmann, M. (2017). *Designing Data-Intensive Applications*. O'Reilly Media.
-- PostgreSQL Documentation. (n.d.). *INSERT ON CONFLICT*. https://www.postgresql.org/docs/15/sql-insert.html
-- Redis Documentation. (n.d.). *Redis Streams*. https://redis.io/docs/data-types/streams/
